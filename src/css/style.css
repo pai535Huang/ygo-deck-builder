@@ -1,0 +1,323 @@
+/* 基础样式 */
+body {
+  font-family: sans-serif;
+  background: #f5f5f5;
+  margin: 0;
+  scrollbar-gutter: stable both-edges;
+}
+
+/* Layout variables */
+:root {
+  --header-h: 21px; /* 再次缩短为之前的一半 */
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* 主布局 */
+.main-layout {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-auto-rows: min-content;
+  grid-template-areas:
+    "header header"
+    "left right";
+  max-width: 1400px;
+  margin: 40px auto;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px #0001;
+  min-height: 720px;
+}
+
+/* Desktop: prevent page-level scrolling so panels' internal scrollbars are used */
+@media (min-width: 900px) {
+  html, body { height: 100%; overflow: hidden; }
+  /* main-layout should fit within viewport minus margins (40px top + 40px bottom) */
+  .main-layout { max-height: calc(100vh - 80px); overflow: visible; }
+}
+
+/* 卡组面板 */
+.deck-panel,
+.search-panel {
+  /* Ensure not treated as flex items in any legacy styles */
+  min-width: 0;
+  /* Prevent any stale inline flex/min-width from affecting layout */
+  flex: initial !important;
+  min-width: 0 !important;
+  width: auto !important;
+}
+
+.page-header {
+  grid-area: header;
+  /* 减小上下内边距，缩短页面 header 与面板之间距离 */
+  padding: 12px 16px 6px 16px;
+  min-height: var(--header-h);
+  display: flex;
+  align-items: center;
+}
+
+.page-title {
+  margin: 0;
+}
+
+.deck-panel {
+  grid-area: left;
+  border-right: 1px solid #eee;
+  /* 减小面板内上间距以靠近页面 header */
+  padding: 12px 16px;
+}
+
+/* 左栏内部滚动：限定高度并在内部滚动，避免页面被拉长 */
+.deck-panel {
+  /* 限制左栏高度，和右侧搜索面板保持一致的视觉比例 */
+  max-height: 75vh;
+  /* 不直接滚动整个面板；将滚动区域限制到 .deck-body（以便 header 固定） */
+  overflow: visible;
+  overscroll-behavior: contain;
+  /* 保证内部可伸缩容器不会因为子元素而撑大宽度 */
+  min-width: 0;
+}
+
+/* deck header 固定，deck body 滚动 */
+.deck-panel .deck-header {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  background: #fff;
+  padding-bottom: 2px;
+  min-height: var(--header-h);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.deck-panel .deck-body {
+  /* 计算可滚动高度：基于面板 max-height，留出 header 高度 */
+  max-height: calc(75vh - var(--header-h));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-top: 4px;
+}
+
+.action-buttons { display:flex; gap:12px; align-items:center; margin-bottom:12px; }
+
+/* 将左栏的操作按钮固定在左栏顶部，避免滚动时被内容覆盖 */
+.deck-panel .action-buttons {
+  position: sticky;
+  top: 0; /* 距离左栏顶部 */
+  z-index: 10; /* 高于卡组内容，但低于可能的全局弹出层 */
+  background: linear-gradient(#fff, #fff); /* 纯白背景，遮挡下面内容视觉 */
+  padding-top: 1px; /* 给粘性条一些呼吸空间 */
+  padding-bottom: 2px;
+}
+
+/* 模式选择下拉，放在左侧操作按钮旁边 */
+.search-mode {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: white;
+  border: 1px solid #ddd;
+  font-size: 14px;
+  height: 38px;
+}
+
+.action-buttons > .search-mode { margin-left: 6px; }
+
+.genesys-info label { font-weight: bold; color: #333; }
+.genesys-info #genesysTotal { color: #e67e22; margin-left: 6px; }
+
+/* 搜索面板 */
+.search-panel {
+  grid-area: right;
+  /* 减小面板内上间距以靠近页面 header */
+  padding: 12px 16px;
+  /* Outer panel shouldn't scroll; .search-body will handle scrolling */
+  max-height: none;
+  overflow: visible;
+  overscroll-behavior: contain;
+}
+
+/* 搜索面板 header/body 分离：固定搜索框，结果滚动 */
+.search-panel .search-header {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  background: #fff;
+  padding-bottom: 2px;
+}
+
+.search-panel .search-body {
+  max-height: calc(75vh - var(--header-h));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-top: 8px;
+}
+
+/* 卡片样式 */
+.card {
+  margin-bottom: 16px;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.card-info h2 {
+  margin: 0 0 8px;
+}
+
+.card-desc {
+  color: #555;
+  margin-top: 8px;
+}
+
+/* 卡组部分 */
+.deck-section {
+  margin-bottom: 32px;
+}
+
+.deck-section h2 {
+  margin-bottom: 8px;
+}
+
+.deck-list > div {
+  margin-bottom: 4px;
+}
+
+.deck-count {
+  font-size: 16px;
+  color: #888;
+  font-weight: normal;
+}
+
+/* 搜索表单 */
+.search-form {
+  margin-bottom: 24px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.search-input {
+  width: 60%;
+  padding: 8px;
+}
+
+.search-button {
+  padding: 8px 16px;
+}
+
+/* 卡片网格 */
+.deck-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.deck-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 50px; /* match thumbnail width */
+}
+
+.deck-card img,
+.deck-thumb {
+  width: 50px;
+  height: 73px;
+  border-radius: 2px;
+  box-shadow: 0 1px 3px #0002;
+  cursor: grab;
+  object-fit: contain; /* 保持等比例 */
+  background: #fff; /* 在未加载时保持白底 */
+}
+
+.deck-card button {
+  margin-top: 2px;
+  font-size: 12px;
+  padding: 0 6px;
+}
+
+/* 空卡组占位，可接收拖拽 */
+.deck-empty {
+  min-height: 60px; /* 略高于 50x73 的高度，提示可投放 */
+  min-width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff; /* 保持纯白底 */
+}
+
+/* 通用按钮样式 */
+.btn {
+  display: inline-block;
+  /* 保持默认按钮背景/文字色，避免覆盖浏览器或 action-button 的样式 */
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform .08s ease, box-shadow .08s ease, opacity .12s ease;
+}
+
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); opacity: .95; }
+.btn:focus { outline: 2px solid rgba(74,111,255,0.12); outline-offset: 2px; }
+
+/* 更小尺寸按钮（用于卡片上的移除按钮） */
+.btn--sm { padding: 4px 8px; font-size: 12px; border-radius: 4px; }
+
+/* 操作按钮 */
+/* 保持向后兼容：action-button 使用通用 btn 样式 */
+/* 不在按钮本身施加左右 margin，使用父容器的 gap 统一间距 */
+.action-button {
+  margin: 0;
+  padding: 8px 18px;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.1;
+}
+
+.action-buttons > * { margin: 0; }
+/* 搜索按钮恢复原始尺寸 */
+.search-button { padding: 8px 16px; }
+
+/* 卡片内部按钮（覆盖全局 btn 风格） */
+.deck-card .btn { padding: 4px 6px; font-size: 12px; border-radius: 4px; background: linear-gradient(180deg,#ff6b6b,#ff5252); color: #fff; box-shadow: 0 1px 4px rgba(255,82,82,0.12); }
+
+/* 将页面顶层可交互按钮替换为 btn（通过类名在 HTML 中应用） */
+
+/* 媒体查询 */
+@media (max-width: 900px) {
+  .main-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "header"
+      "left"
+      "right";
+  }
+
+  .deck-panel,
+  .search-panel {
+    max-width: 100%;
+    min-width: 0 !important;
+    padding: 20px;
+  }
+  /* Mobile: allow natural page scroll */
+  .search-panel { max-height: none; overflow: visible; }
+
+  /* Mobile: left panel should not have internal scroll; allow page scroll */
+  .deck-panel { max-height: none; overflow: visible; border-right: none; border-bottom: 1px solid #eee; }
+
+  /* Mobile: remove sticky header and allow deck-body to expand with the page */
+  .deck-panel .deck-header { position: static; top: auto; z-index: auto; background: transparent; padding-bottom: 0; }
+  .deck-panel .deck-body { max-height: none; overflow: visible; }
+
+  /* Mobile: disable sticky search header and expand search body */
+  .search-panel .search-header { position: static; top: auto; z-index: auto; background: transparent; padding-bottom: 0; }
+  .search-panel .search-body { max-height: none; overflow: visible; }
+
+  /* Mobile: reduce header sizes for compactness */
+  :root { --header-h: 16px; }
+}

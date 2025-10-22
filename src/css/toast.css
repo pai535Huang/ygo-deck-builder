@@ -1,0 +1,54 @@
+/* Unified toast theme */
+:root {
+  --toast-bg-success: rgba(25, 135, 84, 0.95);
+  --toast-bg-error: rgba(220, 53, 69, 0.95);
+  --toast-text: #fff;
+  --toast-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  --toast-z: 2147483647;
+  --toast-gap: 8px;
+  --toast-padding: 10px 12px;
+  --toast-radius: 6px;
+  --toast-max-width: 60vw;
+  --toast-font-size: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --toast-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+}
+
+.ygotoast-container {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: var(--toast-z);
+  display: flex;
+  flex-direction: column;
+  gap: var(--toast-gap);
+  align-items: flex-end;
+  pointer-events: none; /* allow clicks to pass through except on toasts */
+}
+
+.ygotoast {
+  pointer-events: auto;
+  color: var(--toast-text);
+  background: var(--toast-bg-success);
+  padding: var(--toast-padding);
+  border-radius: var(--toast-radius);
+  box-shadow: var(--toast-shadow);
+  font-size: var(--toast-font-size);
+  max-width: var(--toast-max-width);
+  cursor: pointer;
+  user-select: none;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms ease, transform 200ms ease;
+}
+
+.ygotoast.error { background: var(--toast-bg-error); }
+
+.ygotoast.hide {
+  opacity: 0;
+  transform: translateY(4px);
+}

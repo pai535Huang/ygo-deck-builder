@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# App data (keep empty dir)
+data/*
+!data/.gitkeep
+
+# Local scripts not to commit
+/start.sh
+
+# Caches and logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# OS/Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build outputs
+/dist/
+/build/
+/out/
+/coverage/
+
+# Temp files
+/temp/
+*.tmp
+*.swp
+
+# SQLite/DB artifacts (safety; project uses .cdb under data which is ignored)
+*.db
+*.sqlite
+*.sqlite3
+
+# Playwright/Puppeteer browsers cache
+.playwright/
+.puppeteer/

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>YGO 卡组编辑器</title>
+  <link rel="stylesheet" href="src/css/style.css?v=dev">
+  <link rel="stylesheet" href="src/css/toast.css?v=dev">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+  <div class="main-layout">
+    <div class="page-header">
+      <h1 class="page-title">YGO 卡组编辑器</h1>
+    </div>
+    <div class="deck-panel">
+      <div class="deck-header">
+        <div class="action-buttons">
+          <button class="action-button" id="exportBtn">导出</button>
+          <button class="action-button" id="clearBtn">清空</button>
+          <button class="action-button" id="sortBtn">整理</button>
+          <label>
+            <input type="file" id="ydkFileInput" accept=".ydk" style="display:none">
+            <button type="button" id="openYdkBtn" class="action-button">打开</button>
+          </label>
+          <select id="modeSelect" class="search-mode">
+            <option value="OCG">OCG</option>
+            <option value="TCG">TCG</option>
+            <option value="CN">CN</option>
+            <option value="AE">AE</option>
+            <option value="GENESYS">GENESYS</option>
+          </select>
+        </div>
+        <div class="genesys-info">
+          <label>Genesys 总分: <span id="genesysTotal">0</span></label>
+        </div>
+      </div>
+
+      <div class="deck-body">
+        <div class="deck-section">
+          <h2>主卡组 <span id="mainDeckCount" class="deck-count"></span></h2>
+          <div class="deck-list" id="mainDeck"></div>
+        </div>
+
+        <div class="deck-section">
+          <h2>额外卡组 <span id="extraDeckCount" class="deck-count"></span></h2>
+          <div class="deck-list" id="extraDeck"></div>
+        </div>
+
+        <div class="deck-section">
+          <h2>副卡组 <span id="sideDeckCount" class="deck-count"></span></h2>
+          <div class="deck-list" id="sideDeck"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="search-panel">
+      <div class="search-header">
+        <form id="searchForm" class="search-form">
+          <input type="text" id="cardName" class="search-input" placeholder="输入卡片名称" required>
+          <button type="submit" class="search-button">查找</button>
+          <button type="button" id="refreshPreBtn" class="search-button" style="margin-left:8px;">更新先行卡</button>
+        </form>
+      </div>
+      <div class="search-body">
+        <div id="result"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="src/js/main.js"></script>
+</body>
+</html>
