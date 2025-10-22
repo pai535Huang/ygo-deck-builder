@@ -60,34 +60,11 @@ async function downloadToTemp(url, _silent = false) {
 }
 
 async function fetchLatestPatchUrl() {
+  // 直接使用官方 CDN 固定地址，避免依赖 Puppeteer 解析页面
+  // 如需自定义源，可通过环境变量 PRE_URL 覆盖
   const override = process.env.PRE_URL;
-  if (override && /^https?:\/\/.+ygopro-super-pre-/.test(override)) return override;
-  try {
-    const puppeteer = require('puppeteer');
-    const target = 'https://mycard.world/ygopro/arena/index.html#/superpre';
-    const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage'], executablePath: process.env.PUPPETEER_EXECUTABLE_PATH });
-    try {
-      const page = await browser.newPage();
-      await page.setUserAgent('ygo-deck-editor/1.0');
-      await page.goto(target, { waitUntil: 'networkidle2', timeout: Number(process.env.PUPPETEER_GOTO_TIMEOUT_MS || 25000) });
-      await page.waitForSelector('section.update-method a[href*="ygopro-super-pre/archive"]', { timeout: Number(process.env.PUPPETEER_WAIT_SELECTOR_MS || 12000) });
-      const links = await page.evaluate(() => {
-        const abs = (u) => { try { return new URL(u, location.href).toString(); } catch (_) { return null; } };
-        const anchors = Array.from(document.querySelectorAll('section.update-method a[href*="ygopro-super-pre/archive"]'));
-        const hrefs = anchors.map(a => a.getAttribute('href')).filter(Boolean).map(abs).filter(Boolean);
-        return Array.from(new Set(hrefs));
-      });
-      if (Array.isArray(links) && links.length) {
-        const parseVer = (u) => { const m = u.match(/ygopro-super-pre-([0-9.]+)\.ypk/i); return m ? m[1].split('.').map(x=>parseInt(x,10)||0) : []; };
-        links.sort((a,b)=>{ const va=parseVer(a), vb=parseVer(b); const n=Math.max(va.length,vb.length); for(let i=0;i<n;i++){ const xa=va[i]||0, xb=vb[i]||0; if(xa!==xb) return xa-xb;} return 0; });
-        const best = links[links.length-1];
-        if (best) return best;
-      }
-      throw new Error('页面解析成功但未找到 archive 链接（页面结构可能变更）');
-    } finally { try { await browser.close(); } catch (_) {} }
-  } catch (e) {
-    throw new Error('需要 Puppeteer 以解析 mycard 页面，但启动失败：' + (e && e.message ? e.message : e) + '。可设置 PUPPETEER_EXECUTABLE_PATH 指向系统 Chromium，或检查网络/代理。');
-  }
+  if (override && /^https?:\/\/.+\.ypk(\?.*)?$/i.test(override)) return override;
+  return 'https://cdntx.moecube.com/ygopro-super-pre/archive/ygopro-super-pre.ypk';
 }
 
 async function extractArchive(archivePath, outDir) {
@@ -192,7 +169,7 @@ async function main() {
       if (head && head.headers) writeMeta({ url: URL, etag: head.headers['etag'] || head.headers['ETag'] || '', lastModified: head.headers['last-modified'] || head.headers['Last-Modified'] || '', contentLength: head.headers['content-length'] || head.headers['Content-Length'] || '' });
       global.__PRE_URL_SELECTED__ = URL;
     }
-    if (skip) { console.log('Pre-release prepared at', PRE_DIR); return; }
+  if (skip) { console.log('Pre-release prepared at', PRE_DIR); return process.exit(0); }
     if (!fs.existsSync(PRE_DIR)) fs.mkdirSync(PRE_DIR, { recursive: true });
     const archive = await downloadToTemp(global.__PRE_URL_SELECTED__);
     const expected = await extractArchive(archive, PRE_DIR);
@@ -265,9 +242,10 @@ async function main() {
       console.log('Pre-release index written to', idxPath);
       try { const selectedUrl = global.__PRE_URL_SELECTED__; const head2 = await headRequest(selectedUrl); if (head2 && head2.headers) { writeMeta({ url: selectedUrl, etag: head2.headers['etag'] || head2.headers['ETag'] || '', lastModified: head2.headers['last-modified'] || head2.headers['Last-Modified'] || '', contentLength: head2.headers['content-length'] || head2.headers['Content-Length'] || '' }); } else { writeMeta({ url: selectedUrl, etag: '', lastModified: '', contentLength: '' }); } } catch (_) {}
     } catch (e) { console.error('Failed to build pre-release index:', e && e.message ? e.message : e); }
-    console.log('Pre-release prepared at', PRE_DIR);
+  console.log('Pre-release prepared at', PRE_DIR);
     try { if (fs.existsSync(TEMP_DIR)) { for (const f of fs.readdirSync(TEMP_DIR)) { const fp = path.join(TEMP_DIR, f); try { const st = fs.lstatSync(fp); if (st.isDirectory()) { (function rim(fp2){ for (const name of fs.readdirSync(fp2)) { const p2 = path.join(fp2,name); const s2 = fs.lstatSync(p2); if (s2.isDirectory()) rim(p2); else fs.unlinkSync(p2);} })(fp); fs.rmdirSync(fp); } else fs.unlinkSync(fp);} catch (e) {} } } } catch (e) {}
-  } catch (e) { console.error('Failed to prepare pre-release:', e && e.message ? e.message : e); process.exitCode = 1; }
+    return process.exit(0);
+  } catch (e) { console.error('Failed to prepare pre-release:', e && e.message ? e.message : e); return process.exit(1); }
 }
 
 if (require.main === module) main();

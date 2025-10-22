@@ -18,7 +18,7 @@
   - 导出：将编辑好的卡组保存为本地 `.ydk` 文件。
 
 - 先行卡
-  - 支持先行卡：从 mycard 服务器下载先行卡列表，以便于组建包含先行卡的卡组。
+  - 支持先行卡：从 Moecube CDN 下载先行卡补丁包（.ypk）并解包到本地，用于组建包含先行卡的卡组。
 
 - 两种运行形态
   - 基于 Electron 的桌面模式。
@@ -34,12 +34,7 @@
 npm install
 ```
 
-可选：复用系统的 Chromium/Chrome，避免额外下载 Puppeteer 浏览器（首次安装前设置）：
-
-```bash
-export PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-npm install
-```
+说明：本项目不再依赖 Puppeteer，安装阶段不会下载或安装额外浏览器组件。
 
 ## 运行（图形界面）
 
@@ -95,7 +90,22 @@ npm run start:none
 1) 搜索卡片，点击添加到主卡组/额外/副卡组；超过上限会有提示。
 2) 导入/导出 .ydk：使用界面上的导入/导出按钮。
 3) 禁限状态会在卡片上以多地区标记显示（OCG/TCG/CN/AE）。
-4) 先行卡与数据更新：点击界面“更新先行卡”，或使用上面的 CLI 命令手动更新。
+4) 先行卡与数据更新：点击界面“更新先行卡”，或使用下面的 CLI 命令手动更新：
+
+```bash
+npm run update-prerelease
+```
+
+先行卡数据来源与覆盖：
+
+- 默认从 `https://cdntx.moecube.com/ygopro-super-pre/archive/ygopro-super-pre.ypk` 下载。
+- 可通过环境变量覆盖下载源（支持任意 .ypk 链接）：
+
+```bash
+PRE_URL="https://your.mirror/ygopro-super-pre.ypk" npm run update-prerelease
+```
+
+缓存与增量：脚本会使用 HEAD 请求对比 ETag/Last-Modified/Content-Length，若远端未变化则跳过重复下载与解包。
 
 提示：所有数据文件位于 `data/`，前端按需通过本地接口加载；网络不佳时也可离线使用已有数据，之后再执行更新命令。
 

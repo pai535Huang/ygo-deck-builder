@@ -4,6 +4,7 @@
   "description": "YGO deck editor with OCG forbidden list auto-update",
   "main": "electron/main.js",
   "scripts": {
+    "update-prerelease": "node ./scripts/update_prerelease.js",
     "update-data": "node ./scripts/update_forbidden.js",
     "update-data-cn": "node ./scripts/update_forbidden_cn.js",
     "update-genesys": "node ./scripts/update_genesys.js",
@@ -12,7 +13,6 @@
     "start:chromium": "START_BROWSER=chromium node ./scripts/start.js",
     "start:system": "START_BROWSER=system node ./scripts/start.js",
     "start:none": "START_BROWSER=none node ./scripts/start.js",
-    "postinstall": "puppeteer browsers install chrome || true",
     "predev": "node ./scripts/update_forbidden.js && node ./scripts/update_forbidden_cn.js && node ./scripts/update_genesys_and_maybe_build.js",
     "dev": "electron .",
     "dev:system": "electron .",
@@ -24,7 +24,6 @@
   "dependencies": {
     "better-sqlite3": "^11.7.0",
     "playwright": "^1.56.1",
-    "puppeteer": "^24.25.0",
     "unzipper": "^0.10.11"
   },
   "devDependencies": {
