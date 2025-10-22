@@ -302,6 +302,11 @@ async function init() {
       deckData.side.forEach(id => {
         if (idToCard[String(Number(id))]) sideDeck.push(idToCard[String(Number(id))]);
       });
+      // 渲染加载后的卡组并刷新分数
+      try { renderDecks(mainDeck, extraDeck, sideDeck); } catch (err) { console.error('渲染卡组失败:', err); }
+      try { if (window.updateGenesysTotal) window.updateGenesysTotal(); } catch (_) {}
+      // 重置文件选择器，便于连续导入同一文件
+      try { e.target.value = ''; } catch (_) {}
       
     }); // <-- end of ydkInput change handler
   }
