@@ -281,34 +281,34 @@ export function renderSearchResults(results, addCardToDeck) {
   const forbiddenCN = findStatus(cnForbidden);
   const forbiddenAE = findStatus(aeForbidden);
     const genesysPoint = (() => {
-      // prefer lookup by cid/id when available
-      if (genesysById) {
-        if (card.cid && genesysById[String(card.cid)] !== undefined) return genesysById[String(card.cid)];
-        if (card.id && genesysById[String(card.id)] !== undefined) return genesysById[String(card.id)];
-      }
-      if (!genesysIndex) return '';
-      const normalize = (s) => String(s || '').toLowerCase().replace(/&amp;/g, 'and').replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
-      const candidates = [];
-      if (card.cn_name) candidates.push(card.cn_name);
-      if (card.name) candidates.push(card.name);
-      if (card.jp_name) candidates.push(card.jp_name);
-      // try normalized exact match
-      for (const cand of candidates) {
-        if (!cand) continue;
-        const nk = normalize(cand);
-        if (nk && genesysIndex[nk] !== undefined) return genesysIndex[nk];
-      }
-      // try partial match on normalized keys
-      const keys = Object.keys(genesysIndex);
-      for (const cand of candidates) {
-        if (!cand) continue;
-        const nk = normalize(cand);
-        if (!nk) continue;
-        for (const k of keys) {
-          if (k.includes(nk) || nk.includes(k)) return genesysIndex[k];
+      // 1) 以 id 映射为准（由 main.js 构建与刷新）
+      try {
+        const mapById = (window && window._genesysByIdLocal) ? window._genesysByIdLocal : null;
+        if (mapById) {
+          if (card.cid != null && mapById[String(card.cid)] !== undefined) return mapById[String(card.cid)];
+          if (card.id != null && mapById[String(card.id)] !== undefined) return mapById[String(card.id)];
         }
-      }
-      return '';
+      } catch (_) {}
+
+      // 2) 名称索引仅做“规范化后精确匹配”，避免部分包含造成误判
+      try {
+        const idx = (window && window._genesysIndex) ? window._genesysIndex : null;
+        if (idx) {
+          const normalize = (s) => String(s || '').toLowerCase().replace(/&amp;/g, 'and').replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+          const candidates = [];
+          if (card.cn_name) candidates.push(card.cn_name);
+          if (card.name) candidates.push(card.name);
+          if (card.jp_name) candidates.push(card.jp_name);
+          for (const cand of candidates) {
+            if (!cand) continue;
+            const nk = normalize(cand);
+            if (nk && idx[nk] !== undefined) return idx[nk];
+          }
+        }
+      } catch (_) {}
+
+      // 3) 未匹配则为 0 分
+      return 0;
     })();
 
     const imgSrc = card.pic ? card.pic : `https://cdn.233.momobako.com/ygopro/pics/${card.id}.jpg`;
@@ -324,7 +324,7 @@ export function renderSearchResults(results, addCardToDeck) {
           ${window.currentMode === 'TCG' && forbiddenTCG ? `<div style="color:#06b; margin-top:4px;">TCG: ${forbiddenTCG}</div>` : ''}
           ${window.currentMode === 'CN' && forbiddenCN ? `<div style="color:#080; margin-top:4px;">CN: ${forbiddenCN}</div>` : ''}
           ${window.currentMode === 'AE' && forbiddenAE ? `<div style="color:#800080; margin-top:4px;">AE: ${forbiddenAE}</div>` : ''}
-          ${window.currentMode === 'GENESYS' && genesysPoint ? `<div style="color:#e67e22; margin-top:4px;">Genesys: ${genesysPoint}</div>` : ''}
+          ${(() => { const gp = genesysPoint; const show = (window.currentMode === 'GENESYS') && (gp !== '' && gp !== null && gp !== undefined); return show ? `<div style="color:#e67e22; margin-top:4px;">Genesys: ${gp}</div>` : ''; })()}
           <div class="card-desc">${card.text && card.text.desc ? card.text.desc.replace(/\n/g, '<br>') : ''}</div>
           <div style="margin-top:8px;">${btns}</div>
         </div>

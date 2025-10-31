@@ -26,6 +26,33 @@ async function init() {
   let genesysScores = null;
   let nameIdMap = null;
   let genesysByIdLocal = null;
+  let genesysIndexLocal = null; // 规范化的名称索引，用于搜索展示兜底
+  const buildGenesysFrom = (scores, nameMap) => {
+    const byId = {};
+    const idx = {};
+    try {
+      const normalize = (s) => String(s||'').toLowerCase().replace(/&amp;/g,'and').replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
+      // 名称索引
+      for (const k of Object.keys(scores||{})) idx[normalize(k)] = scores[k];
+      // id 映射
+      for (const srcName of Object.keys(nameMap||{})) {
+        const entry = nameMap[srcName];
+        const candidateNames = [srcName, entry && entry.name].filter(Boolean);
+        let score = null;
+        for (const cn of candidateNames) {
+          if (!cn) continue;
+          if (scores && scores[cn] !== undefined) { score = scores[cn]; break; }
+          const nk = normalize(cn);
+          if (idx[nk] !== undefined) { score = idx[nk]; break; }
+        }
+        if (score !== null) {
+          if (entry && entry.id) byId[String(entry.id)] = score;
+          if (entry && entry.cid) byId[String(entry.cid)] = score;
+        }
+      }
+    } catch (_) {}
+    return { byId, idx };
+  };
   try {
     const p1 = new Promise((resolve) => {
       const xhr = new XMLHttpRequest(); xhr.open('GET', '/data/genesys_scores.json', true);
@@ -38,28 +65,10 @@ async function init() {
       xhr.send();
     });
     await Promise.all([p1,p2]);
-    // build genesysByIdLocal mapping
-    genesysByIdLocal = {};
-    try {
-      const normalize = (s) => String(s||'').toLowerCase().replace(/&amp;/g,'and').replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
-      const normIndex = {};
-      for (const k of Object.keys(genesysScores||{})) normIndex[normalize(k)] = genesysScores[k];
-      for (const srcName of Object.keys(nameIdMap||{})) {
-        const entry = nameIdMap[srcName];
-        const candidateNames = [srcName, entry && entry.name].filter(Boolean);
-        let score = null;
-        for (const cn of candidateNames) {
-          if (!cn) continue;
-          if (genesysScores && genesysScores[cn] !== undefined) { score = genesysScores[cn]; break; }
-          const nk = normalize(cn);
-          if (normIndex[nk] !== undefined) { score = normIndex[nk]; break; }
-        }
-        if (score !== null) {
-          if (entry && entry.id) genesysByIdLocal[String(entry.id)] = score;
-          if (entry && entry.cid) genesysByIdLocal[String(entry.cid)] = score;
-        }
-      }
-    } catch (e) { genesysByIdLocal = {}; }
+    // build mapping and index
+    const built = buildGenesysFrom(genesysScores, nameIdMap);
+    genesysByIdLocal = built.byId || {};
+    genesysIndexLocal = built.idx || {};
   } catch (e) { genesysScores = nameIdMap = genesysByIdLocal = null; }
   // 渲染初始卡组
   renderDecks(mainDeck, extraDeck, sideDeck);
@@ -76,6 +85,29 @@ async function init() {
         localStorage.setItem('ygo_mode', window.currentMode);
         // update genesys total display when switching modes
         try { window.updateGenesysTotal(); } catch (_) {}
+        // 若切换到 GENESYS 模式，刷新分值缓存并重渲染当前搜索结果，确保显示为最新
+        try {
+          if (window.currentMode === 'GENESYS' && typeof window.refreshGenesysCache === 'function') {
+            window.refreshGenesysCache().then(() => {
+              try {
+                if (Array.isArray(window.searchResults) && window.searchResults.length) {
+                  // 切换到 GENESYS 后立即过滤灵摆/连接
+                  const filtered = window.searchResults.filter((c) => {
+                    try {
+                      const t1 = String(c && c.type != null ? c.type : '').toLowerCase();
+                      const t2 = String(c && c.text && c.text.types ? c.text.types : '').toLowerCase();
+                      const banned = t1.includes('pendulum') || t1.includes('link') || t2.includes('灵摆') || t2.includes('连接');
+                      return !banned;
+                    } catch (_) { return true; }
+                  });
+                  window.searchResults = filtered;
+                  const el = document.getElementById('result');
+                  if (el) el.innerHTML = renderSearchResults(window.searchResults);
+                }
+              } catch (_) {}
+            });
+          }
+        } catch (_) {}
       });
     }
   } catch (err) {
@@ -84,6 +116,23 @@ async function init() {
 
   // expose updateGenesysTotal to compute score based on current decks
   window._genesysByIdLocal = genesysByIdLocal || {};
+  window._genesysIndex = genesysIndexLocal || {};
+  // 提供刷新 GENESYS 缓存的函数（带 cache bust）
+  window.refreshGenesysCache = async () => {
+    try {
+      const [scoresRes, nameMapRes] = await Promise.all([
+        fetch('/data/genesys_scores.json?ts=' + Date.now(), { cache: 'reload' }).catch(() => null),
+        fetch('/data/name_id_map.json?ts=' + Date.now(), { cache: 'reload' }).catch(() => null),
+      ]);
+      const newScores = scoresRes && scoresRes.ok ? (await scoresRes.json()) : genesysScores || {};
+      const newNameMap = nameMapRes && nameMapRes.ok ? (await nameMapRes.json()) : nameIdMap || {};
+      const built = buildGenesysFrom(newScores, newNameMap);
+      genesysScores = newScores;
+      nameIdMap = newNameMap;
+      window._genesysByIdLocal = built.byId || {};
+      window._genesysIndex = built.idx || {};
+    } catch (_) { /* ignore refresh errors */ }
+  };
   window.updateGenesysTotal = () => {
     const el = document.getElementById('genesysTotal');
     if (!el) return;
@@ -105,16 +154,39 @@ async function init() {
   // 绑定搜索表单
   const searchForm = document.getElementById('searchForm');
   if (searchForm) {
+    // GENESYS 模式过滤：灵摆/连接 怪兽不显示
+    const isGenesysBannedType = (card) => {
+      try {
+        const t1 = String(card && card.type != null ? card.type : '').toLowerCase();
+        const t2 = String(card && card.text && card.text.types ? card.text.types : '').toLowerCase();
+        if (t1.includes('pendulum') || t1.includes('link')) return true;
+        if (t2.includes('灵摆') || t2.includes('连接')) return true;
+      } catch (_) {}
+      return false;
+    };
+    const maybeFilterForGenesys = (arr) => {
+      try {
+        if (window.currentMode === 'GENESYS' && Array.isArray(arr)) {
+          return arr.filter((c) => !isGenesysBannedType(c));
+        }
+      } catch (_) {}
+      return arr;
+    };
     searchForm.onsubmit = async (e) => {
       e.preventDefault();
       const name = document.getElementById('cardName').value;
       document.getElementById('result').innerHTML = '查询中...';
       
-      const results = await searchCard(name);
-      if (results === null) {
+  // 在每次搜索前，刷新 GENESYS 分值缓存，确保展示使用最新数据
+  try { await window.refreshGenesysCache(); } catch (_) {}
+  const resultsRaw = await searchCard(name);
+      if (resultsRaw === null) {
         document.getElementById('result').innerHTML = '查询失败，请稍后重试。';
         return;
       }
+      let results = Array.isArray(resultsRaw) ? resultsRaw : [];
+      // GENESYS 模式：过滤灵摆/连接
+      results = maybeFilterForGenesys(results);
 
       // 尝试合并 pre-release 索引（优先显示）
       try {
@@ -143,7 +215,8 @@ async function init() {
               }
             }
             if (matches.length) {
-              window.searchResults = [...matches, ...(Array.isArray(results) ? results : [])];
+              const combined = [...matches, ...(Array.isArray(results) ? results : [])];
+              window.searchResults = maybeFilterForGenesys(combined);
               document.getElementById('result').innerHTML = renderSearchResults(window.searchResults);
               return;
             }
