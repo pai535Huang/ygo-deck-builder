@@ -13,6 +13,8 @@ function normalizeForbiddenLabel(raw, source) {
   // CN (中文) - map 半限制 to 准限制, 保持 禁止/限制
   if (source === 'CN') {
     if (s.includes('禁止')) return '禁止';
+    // 先匹配“准限制”（以及容错：包含“准”字）再匹配“限制”
+    if (s.includes('准限制') || s.includes('准')) return '准限制';
     if (s.includes('半') && s.includes('限')) return '准限制';
     if (s.includes('限制')) return '限制';
     return s;
