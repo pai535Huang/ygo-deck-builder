@@ -19,19 +19,15 @@ function fetchJson(url) {
   });
 }
 
-// 从最外层 section.type 推导状态，仅接受：禁止卡/限制卡/准限制卡（兼容“半限制卡”=>“准限制”）
+// 从最外层 section.type 推导状态，仅接受：禁止卡/限制卡/准限制卡
 function statusFromSectionType(type) {
   if (!type || typeof type !== 'string') return null;
-  const t = type.trim();
-  if (t === '禁止卡') return '禁止';
-  if (t === '限制卡') return '限制';
-  if (t === '准限制卡' || t === '半限制卡') return '准限制';
-  // 其它（如“更新卡片”、“解除限制卡片”）忽略
+  // 仅处理这三类，其它（如“更新卡片”、“解除限制卡片”）忽略
+  if (type === '禁止卡') return '禁止';
+  if (type === '限制卡') return '限制';
+  if (type === '准限制卡') return '准限制';
   return null;
 }
-
-// 多分组重复出现时的合并规则：选择“更宽松”的结果（准限制 > 限制 > 禁止）
-const statusScore = { '禁止': 0, '限制': 1, '准限制': 2 };
 
 async function main() {
   const url = 'https://yxwdbapi.windoent.com/forbiddenCard/forbiddencard/cachelist?groupId=1';
@@ -54,10 +50,7 @@ async function main() {
                 ? String(item.id)
                 : null;
             if (cardNo) {
-              const prev = map[cardNo];
-              if (prev == null || (statusScore[status] ?? -1) > (statusScore[prev] ?? -1)) {
-                map[cardNo] = status; // 以“更宽松”的状态覆盖之前的值
-              }
+              map[cardNo] = status; // 直接以外层 type（去掉“卡”后）作为状态：禁止/限制/准限制
             }
           });
         }
