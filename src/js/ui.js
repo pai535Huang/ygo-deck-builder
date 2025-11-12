@@ -14,11 +14,13 @@ export function renderDeckRow(deck, deckType, removeCard) {
              ondragstart="window.handleDragStart('${deckType}', ${i}, event)"
              ondragover="window.handleDragOver('${deckType}', ${i}, event)"
              ondrop="window.handleDrop('${deckType}', ${i}, event)"
-             ondragend="window.handleDragEnd(event)">
+             ondragend="window.handleDragEnd(event)"
+             onmouseenter="window.showDeckPreview('${deckType}', ${i}, event)"
+             onmousemove="window.moveDeckPreview(event)"
+             onmouseleave="window.hideDeckPreview()">
     <img class="deck-thumb" src="${thumbSrc}" 
       width="50" height="73" 
                alt="${c && (c.cn_name || c.name) ? (c.cn_name || c.name) : ''}"
-               title="点击移除，拖动以排序"
                onerror="this.onerror=null; this.src='https://cdn.233.momobako.com/ygopro/pics/${c.id}.jpg';"
                onclick="window.handleThumbClick('${deckType}', ${i})">
         </div>

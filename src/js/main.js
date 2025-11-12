@@ -1,5 +1,5 @@
 import { mainDeck, extraDeck, sideDeck, addCardToDeck, removeCard, clearAllDecks, exportYDK, sortDecks } from './deck.js';
-import { searchCard, renderSearchResults, loadForbidden } from './search.js';
+import { searchCard, renderSearchResults, loadForbidden, getForbiddenLabelForCard } from './search.js';
 import { renderDecks, parseYDKFile, fetchCardInfo } from './ui.js';
 
 // 全局搜索结果存储
@@ -275,6 +275,7 @@ async function init() {
   // 绑定“更新先行卡”按钮
   try {
     const btn = document.getElementById('refreshPreBtn');
+    const showAllBtn = document.getElementById('showPreAllBtn');
     if (btn) {
       btn.addEventListener('click', async () => {
         const orig = btn.textContent;
@@ -336,6 +337,45 @@ async function init() {
           notify(msg, 'error');
         } finally {
           btn.disabled = false; btn.textContent = orig;
+        }
+      });
+    }
+    if (showAllBtn) {
+      showAllBtn.addEventListener('click', async () => {
+        const orig = showAllBtn.textContent;
+        showAllBtn.disabled = true; showAllBtn.textContent = '加载中...';
+        try {
+          // 拉取最新 index.json
+          const res = await fetch('/data/pre-release/index.json?ts=' + Date.now(), { cache: 'reload' });
+          if (!res.ok) {
+            window.notify && window.notify('加载先行卡失败', 'error');
+            return;
+          }
+          let arr = await res.json();
+          if (!Array.isArray(arr)) arr = [];
+          // Genesys 模式过滤灵摆/连接
+          const isGenesys = (window.currentMode === 'GENESYS');
+          if (isGenesys) {
+            arr = arr.filter((c) => {
+              try {
+                const t1 = String(c && c.type != null ? c.type : '').toLowerCase();
+                const t2 = String(c && c.text && c.text.types ? c.text.types : '').toLowerCase();
+                const banned = t1.includes('pendulum') || t1.includes('link') || t2.includes('灵摆') || t2.includes('连接');
+                return !banned;
+              } catch (_) { return true; }
+            });
+          }
+          // 排序：按 id 升序（先行卡通常按发布时间或 pack 展现，简单 id 排序即可）
+          arr.sort((a,b) => {
+            const ia = Number(a && a.id); const ib = Number(b && b.id); return ia - ib; });
+          window.searchResults = arr;
+          const el = document.getElementById('result');
+          if (el) el.innerHTML = renderSearchResults(window.searchResults);
+          window.notify && window.notify('显示全部先行卡，共 ' + arr.length + ' 张', 'success');
+        } catch (e) {
+          window.notify && window.notify('显示先行卡失败: ' + (e && e.message ? e.message : e), 'error');
+        } finally {
+          showAllBtn.disabled = false; showAllBtn.textContent = orig;
         }
       });
     }
@@ -494,3 +534,103 @@ window.handleGridDrop = (targetDeckType, ev) => {
   _dragState.fromIndex = -1;
   renderDecks(mainDeck, extraDeck, sideDeck);
 };
+
+// ====== 悬浮预览（卡组区域） ======
+(() => {
+  let previewEl = null;
+  const ensurePreviewEl = () => {
+    if (previewEl && document.body.contains(previewEl)) return previewEl;
+    previewEl = document.createElement('div');
+    previewEl.className = 'deck-card-preview';
+    previewEl.style.position = 'fixed';
+    previewEl.style.zIndex = '9999';
+    previewEl.style.pointerEvents = 'none';
+    previewEl.style.display = 'none';
+    document.body.appendChild(previewEl);
+    return previewEl;
+  };
+  const buildPreviewHtml = (card) => {
+    if (!card) return '';
+    const imgSrc = card.pic ? card.pic : `https://cdn.233.momobako.com/ygopro/pics/${card.id}.jpg`;
+    const preTag = card.source === 'pre' ? `<span class="pre-badge">先行</span>` : '';
+    const name = (card.cn_name || card.name || '')
+      .replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const types = card.text && card.text.types ? card.text.types : '';
+    const desc = card.text && card.text.desc ? card.text.desc.replace(/\n/g,'<br>') : '';
+    const mode = window.currentMode || 'OCG';
+    let forbidden = '';
+    try { forbidden = getForbiddenLabelForCard(card, mode) || ''; } catch (_) {}
+    // Genesys 分数（与搜索结果一致的策略）
+    const genesysPoint = (() => {
+      try {
+        const mapById = (window && window._genesysByIdLocal) ? window._genesysByIdLocal : null;
+        if (mapById) {
+          if (card.cid != null && mapById[String(card.cid)] !== undefined) return mapById[String(card.cid)];
+          if (card.id != null && mapById[String(card.id)] !== undefined) return mapById[String(card.id)];
+        }
+      } catch (_) {}
+      try {
+        const idx = (window && window._genesysIndex) ? window._genesysIndex : null;
+        if (idx) {
+          const normalize = (s) => String(s || '').toLowerCase().replace(/&amp;/g, 'and').replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+          const candidates = [];
+          if (card.cn_name) candidates.push(card.cn_name);
+          if (card.name) candidates.push(card.name);
+          if (card.jp_name) candidates.push(card.jp_name);
+          for (const cand of candidates) { const nk = normalize(cand); if (nk && idx[nk] !== undefined) return idx[nk]; }
+        }
+      } catch (_) {}
+      return 0;
+    })();
+    const lines = [];
+    if (types) lines.push(`<div class="type-line">${types}</div>`);
+    if (mode === 'GENESYS') lines.push(`<div class="genesys">Genesys: ${genesysPoint}</div>`);
+    else if (forbidden) lines.push(`<div class="forbidden">${mode}: ${forbidden}</div>`);
+    return `
+      <div class="preview-inner">
+        <div class="preview-media"><img src="${imgSrc}" alt="${name}" onerror="this.onerror=null; this.src='https://cdn.233.momobako.com/ygopro/pics/${card.id}.jpg';"></div>
+        <div class="preview-info">
+          <div class="title">${preTag}${name}</div>
+          ${lines.join('')}
+          <div class="desc">${desc}</div>
+        </div>
+      </div>
+    `;
+  };
+  const place = (ev) => {
+    const el = ensurePreviewEl();
+    const pad = 12; // offset from cursor
+    const vw = window.innerWidth || document.documentElement.clientWidth || 1024;
+    const vh = window.innerHeight || document.documentElement.clientHeight || 768;
+    const rect = el.getBoundingClientRect();
+    let x = ev.clientX + pad;
+    let y = ev.clientY + pad;
+    if (x + rect.width + pad > vw) x = Math.max(8, ev.clientX - rect.width - pad);
+    if (y + rect.height + pad > vh) y = Math.max(8, ev.clientY - rect.height - pad);
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+  };
+
+  window.showDeckPreview = (deckType, index, ev) => {
+    try {
+      // 拖拽中或按下鼠标时不展示预览
+      if ((ev && ev.buttons === 1) || (typeof _dragState !== 'undefined' && _dragState.fromIndex !== -1)) return;
+      const arr = deckType === 'main' ? mainDeck : (deckType === 'extra' ? extraDeck : sideDeck);
+      const card = (arr && arr[index]) ? arr[index] : null;
+      const el = ensurePreviewEl();
+      el.innerHTML = buildPreviewHtml(card);
+      el.style.display = card ? 'block' : 'none';
+      if (card) place(ev);
+    } catch (_) {}
+  };
+  window.moveDeckPreview = (ev) => {
+    try {
+      if (ev && ev.buttons === 1) { window.hideDeckPreview(); return; }
+      const el = ensurePreviewEl();
+      if (el.style.display !== 'none') place(ev);
+    } catch (_) {}
+  };
+  window.hideDeckPreview = () => {
+    try { const el = ensurePreviewEl(); el.style.display = 'none'; } catch (_) {}
+  };
+})();

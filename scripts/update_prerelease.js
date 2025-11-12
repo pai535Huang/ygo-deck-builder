@@ -28,6 +28,24 @@ async function ensureTempDir() {
   }
 }
 
+function clearDir(dir) {
+  try {
+    if (!fs.existsSync(dir)) return;
+    for (const name of fs.readdirSync(dir)) {
+      const fp = path.join(dir, name);
+      try {
+        const st = fs.lstatSync(fp);
+        if (st.isDirectory()) {
+          (function rim(fp2){ for (const n of fs.readdirSync(fp2)) { const p2 = path.join(fp2,n); const s2 = fs.lstatSync(p2); if (s2.isDirectory()) rim(p2); else fs.unlinkSync(p2);} })(fp);
+          fs.rmdirSync(fp);
+        } else {
+          fs.unlinkSync(fp);
+        }
+      } catch (_) {}
+    }
+  } catch (_) {}
+}
+
 async function downloadToTemp(url, _silent = false) {
   await ensureTempDir();
   const dest = path.join(TEMP_DIR, 'archive.ypk');
@@ -148,28 +166,13 @@ async function main() {
   try {
     console.log('Preparing pre-release directory:', PRE_DIR);
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    // Always clear pre-release directory before updating
+    if (!fs.existsSync(PRE_DIR)) fs.mkdirSync(PRE_DIR, { recursive: true });
+    clearDir(PRE_DIR);
+
     const URL = await fetchLatestPatchUrl();
     console.log('Selected pre-release URL:', URL);
-    let skip = false;
-    {
-      const HARD_HEAD_MS = Number(process.env.HARD_HEAD_MS || 3000);
-      const raced = await Promise.race([headRequest(URL), new Promise((resolve) => setTimeout(() => resolve('__HARD_TIMEOUT__'), HARD_HEAD_MS))]);
-      const head = (raced === '__HARD_TIMEOUT__') ? null : raced;
-      const prev = readMeta();
-      const idxExists = fs.existsSync(path.join(PRE_DIR, 'index.json')) && fs.existsSync(path.join(PRE_DIR, 'pics'));
-      if (head && head.statusCode && head.statusCode >= 200 && head.statusCode < 400 && idxExists) {
-        const etag = head.headers['etag'] || head.headers['ETag'];
-        const lm = head.headers['last-modified'] || head.headers['Last-Modified'];
-        const len = head.headers['content-length'] || head.headers['Content-Length'];
-        if (prev && prev.url === URL && ((etag && prev.etag === etag) || (lm && prev.lastModified === lm) || (len && prev.contentLength === len))) {
-          console.log('Remote archive unchanged; skipping download and rebuild.');
-          skip = true;
-        }
-      }
-      if (head && head.headers) writeMeta({ url: URL, etag: head.headers['etag'] || head.headers['ETag'] || '', lastModified: head.headers['last-modified'] || head.headers['Last-Modified'] || '', contentLength: head.headers['content-length'] || head.headers['Content-Length'] || '' });
-      global.__PRE_URL_SELECTED__ = URL;
-    }
-  if (skip) { console.log('Pre-release prepared at', PRE_DIR); return process.exit(0); }
+    global.__PRE_URL_SELECTED__ = URL;
     if (!fs.existsSync(PRE_DIR)) fs.mkdirSync(PRE_DIR, { recursive: true });
     const archive = await downloadToTemp(global.__PRE_URL_SELECTED__);
     const expected = await extractArchive(archive, PRE_DIR);

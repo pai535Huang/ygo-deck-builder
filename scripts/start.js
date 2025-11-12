@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const PORT = process.env.PORT || 8000;
+const BASE_PORT = Number(process.env.PORT || 8000);
 
 function runUpdate() {
   return new Promise((resolve, reject) => {
@@ -74,10 +74,9 @@ async function openInChromium(url, onExit) {
   }
 }
 
-function startServer() {
-  const root = path.join(__dirname, '..');
+function createServerHandler(root) {
   let _updating = false;
-  const server = http.createServer((req, res) => {
+  return (req, res) => {
     const urlPath = decodeURIComponent(req.url.split('?')[0]);
     // SSE progress stream to update pre-release with live progress
     if (req.method === 'GET' && urlPath === '/__update_prerelease_stream') {
@@ -166,21 +165,52 @@ function startServer() {
       const stream = fs.createReadStream(fsPath);
       stream.pipe(res);
     });
-  });
-  server.listen(PORT, () => {
-    const url = 'http://127.0.0.1:' + PORT;
-    console.log('Static server running at ' + url);
-    const pref = String(process.env.START_BROWSER || '').toLowerCase();
-    if (['none', 'off', 'false'].includes(pref)) return;
+  };
+}
+
+async function startServer() {
+  const root = path.join(__dirname, '..');
+  const handler = createServerHandler(root);
+  const tryPorts = [];
+  for (let i=0;i<10;i++) tryPorts.push(BASE_PORT + i);
+  // 最后加一个 0 代表系统随机端口兜底
+  tryPorts.push(0);
+  let server = null;
+  let selectedPort = null;
+  for (const p of tryPorts) {
+    try {
+      server = http.createServer(handler);
+      await new Promise((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(p, '127.0.0.1', () => {
+          server.off('error', reject);
+          resolve();
+        });
+      });
+      selectedPort = server.address().port;
+      break;
+    } catch (e) {
+      if (server) { try { server.close(); } catch (_) {} }
+      server = null;
+      continue;
+    }
+  }
+  if (!server || !selectedPort) {
+    console.error('Failed to bind any port starting from', BASE_PORT);
+    process.exit(1);
+  }
+  const url = 'http://127.0.0.1:' + selectedPort;
+  console.log('Static server running at ' + url + (selectedPort !== BASE_PORT ? ` (fallback from ${BASE_PORT})` : ''));
+  const pref = String(process.env.START_BROWSER || '').toLowerCase();
+  if (!['none', 'off', 'false'].includes(pref)) {
     if (pref === 'chromium' || pref === 'playwright') {
       openInChromium(url, () => {
         try { server.close(() => process.exit(0)); } catch (_) { process.exit(0); }
       });
     } else {
-      // 默认使用系统浏览器，便于测试
       openSystemBrowser(url);
     }
-  });
+  }
 }
 
 async function main() {
